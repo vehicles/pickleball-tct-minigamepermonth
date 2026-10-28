@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minigame Pickleball TCT - 01/11/2026</title>
+    <title>Minigame Pickleball TCT Club</title>
     <!-- Thư viện Firebase Realtime Database SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -282,7 +282,7 @@
 
     <div class="nav-tabs">
         <button id="tabScheduleBtn" class="tab-btn active" onclick="switchTab('schedule')">📅 LỊCH THI ĐẤU</button>
-        <button id="tabTeamsBtn" class="tab-btn" onclick="switchTab('teams')">👥 DANH SÁCH 3 TEAM</button>
+        <button id="tabTeamsBtn" class="tab-btn" onclick="switchTab('teams')">👥 DANH SÁCH</button>
         <button id="tabStandingsBtn" class="tab-btn" onclick="switchTab('standings')">🏆 BẢNG XẾP HẠNG</button>
     </div>
 
@@ -310,7 +310,7 @@
 
     <!-- TAB 3: BẢNG XẾP HẠNG -->
     <div id="tabStandings" class="tab-content" style="display: none;">
-        <div class="section-title">🏆 BẢNG XẾP HẠNG TỔNG SẮP 3 TEAM</div>
+        <div class="section-title">🏆 BẢNG XẾP HẠNG</div>
         <table>
             <thead>
                 <tr>
@@ -333,11 +333,11 @@ const PIN_REFEREE = "1234";
 let currentRole = "guest"; 
 
 const CATEGORIES = [
-    { id: 1, name: "1️⃣ Đôi Nữ (Mở màn)" },
+    { id: 1, name: "1️⃣ Đôi Nữ" },
     { id: 2, name: "2️⃣ Đôi Nam 1" },
     { id: 3, name: "3️⃣ Đôi Nam Nữ 1" },
     { id: 4, name: "4️⃣ Đôi Nam 2" },
-    { id: 5, name: "5️⃣ Đôi Nam Nữ 2 (Trận chốt)" }
+    { id: 5, name: "5️⃣ Đôi Nam Nữ 2" }
 ];
 
 const defaultTeams = {
@@ -447,7 +447,7 @@ function toggleAuthRole() {
         currentRole = 'guest';
         alert("🔒 Đã chuyển về giao diện Khán giả.");
     } else {
-        const pin = prompt("Nhập mã PIN (1234: Trọng tài | 1956: BTC):");
+        const pin = prompt("Nhập mã:");
         if (pin === PIN_BTC) {
             currentRole = 'btc';
             alert("👑 Đã đăng nhập vai trò BAN TỔ CHỨC!");
