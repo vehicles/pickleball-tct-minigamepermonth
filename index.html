@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Minigame Pickleball TCT - 01/11/2026</title>
+    <!-- Thư viện Firebase Realtime Database SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "pickleball-tct70.firebaseapp.com",
+            databaseURL: "https://pickleball-tct70-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "pickleball-tct70",
+            storageBucket: "pickleball-tct70.appspot.com",
+            messagingSenderId: "1015003889551",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        window.dbMinigameMatchesRef = ref(db, 'minigame_matches');
+        window.dbMinigamePairsRef = ref(db, 'minigame_pairs');
+        window.dbSet = set;
+
+        // Lắng nghe dữ liệu tỷ số các trận đấu Realtime
+        onValue(window.dbMinigameMatchesRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                matchesData = data;
+            } else {
+                initDefaultMatches();
+            }
+            renderScheduleAndCourts();
+            updateStandings();
+        });
+
+        // Lắng nghe danh sách Đôi thi đấu
+        onValue(window.dbMinigamePairsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                teamPairsData = data;
+            } else {
+                initDefaultPairs();
+            }
+            renderTeamPairsUI();
+            renderScheduleAndCourts();
+        });
+    </script>
+
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 8px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 1100px; margin: 0 auto; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        .header { text-align: center; border-bottom: 2px solid #2980b9; padding-bottom: 10px; margin-bottom: 15px; }
+        .header h1 { color: #1a5276; margin: 0; font-size: 20px; text-transform: uppercase; }
+        .header .subtitle { color: #e67e22; font-weight: bold; font-size: 13px; margin-top: 5px; }
+        .header .info { color: #555; font-size: 12px; margin-top: 3px; }
+
+        .btn-auth { background-color: #34495e; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-weight: bold; font-size: 12px; cursor: pointer; float: right; margin-top: -40px; }
+
+        .nav-tabs { display: flex; justify-content: space-between; gap: 5px; margin-bottom: 15px; }
+        .tab-btn { flex: 1; padding: 10px 5px; border: none; background: #eef7fc; color: #1a5276; font-weight: bold; font-size: 13px; border-radius: 6px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: #2980b9; color: white; }
+
+        .section-title { background: #1a5276; color: white; padding: 8px 12px; border-radius: 6px; font-size: 15px; font-weight: bold; margin-top: 15px; margin-bottom: 10px; }
+
+        /* Style danh sách Team */
+        .teams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+        .team-box { border: 1px solid #3498db; border-radius: 8px; background: #fafcfd; padding: 10px; border-top: 4px solid #2980b9; }
+        .team-title { font-weight: bold; color: #1a5276; font-size: 15px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 5px; }
+        th, td { border: 1px solid #ddd; padding: 6px 4px; text-align: center; }
+        th { background: #eef7fc; color: #1a5276; }
+
+        .pair-input { width: 95%; padding: 4px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px; box-sizing: border-box; }
+
+        /* Style Sân đấu & Lịch thi đấu */
+        .rounds-container { display: flex; flex-direction: column; gap: 15px; }
+        .round-box { border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; background: #fff; }
+        .round-header { font-weight: bold; color: #d35400; background: #fef5e7; padding: 6px 10px; border-radius: 5px; margin-bottom: 8px; font-size: 14px; }
+        
+        .matches-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+        .match-card { border: 1px dashed #f39c12; background: #fffdf9; padding: 10px; border-radius: 8px; text-align: center; }
+        .match-title { font-weight: bold; color: #2c3e50; font-size: 13px; margin-bottom: 4px; }
+        .match-category { font-size: 11px; color: #7f8c8d; font-weight: bold; margin-bottom: 6px; }
+
+        .score-control { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
+        .btn-step { width: 36px; height: 36px; font-size: 18px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; }
+        .btn-minus { background: #e74c3c; }
+        .btn-plus { background: #27ae60; }
+        .btn-step:disabled { opacity: 0.3; cursor: not-allowed; }
+        
+        .score-display { width: 45px; height: 36px; font-size: 20px; font-weight: bold; text-align: center; border: 2px solid #e67e22; border-radius: 6px; }
+
+        .winner-tag { background: #27ae60; color: white; font-weight: bold; padding: 4px; border-radius: 4px; font-size: 12px; margin-top: 5px; }
+
+        /* Rules card */
+        .rules-card { background: #eef7fc; border-left: 4px solid #3498db; padding: 10px; font-size: 12px; line-height: 1.5; margin-top: 15px; border-radius: 0 6px 6px 0; }
+
+        .btc-btn { background: #e74c3c; color: white; border: none; padding: 6px 10px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-left: 5px; }
+
+        @media (max-width: 600px) {
+            .header h1 { font-size: 16px; }
+            .btn-auth { float: none; margin: 5px auto 0 auto; display: block; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <button id="authBtn" class="btn-auth" onclick="toggleAuthRole()">🔑 Khán giả</button>
+        <h1>🏓 MINIGAME PICKLEBALL TCT</h1>
+        <div class="subtitle">GIAO LƯU & RA MẮT BĐH CLB (01/11/2026)</div>
+        <div class="info">📍 Địa điểm: Sân Pickleball Láng Hạ | ⏰ Tập trung: 07h30</div>
+    </div>
+
+    <div class="nav-tabs">
+        <button id="tabScheduleBtn" class="tab-btn active" onclick="switchTab('schedule')">📅 LỊCH THI ĐẤU & CẶP ĐẤU</button>
+        <button id="tabTeamsBtn" class="tab-btn" onclick="switchTab('teams')">👥 DANH SÁCH 3 TEAM</button>
+        <button id="tabStandingsBtn" class="tab-btn" onclick="switchTab('standings')">🏆 BẢNG XẾP HẠNG</button>
+    </div>
+
+    <!-- TAB 1: LỊCH THI ĐẤU & CẶP ĐẤU -->
+    <div id="tabSchedule" class="tab-content">
+        <div class="section-title">📅 LỊCH THI ĐẤU CHI TIẾT (8 LƯỢT TRẬN - 2 SÂN)</div>
+        <div id="roundsGrid" class="rounds-container"></div>
+
+        <div class="rules-card">
+            <strong>📋 LUẬT TÍNH ĐIỂM & XẾP HẠNG:</strong><br>
+            • Thi đấu Rally Scoring chạm 21 điểm (Đổi sân ở mốc 11 điểm).<br>
+            • Mốc 21 điểm áp dụng <i>Side-Out Match Point</i> (Đội Giao bóng mới được ăn điểm quyết định).<br>
+            • Xếp hạng: 1. Tổng số trận thắng Đôi ➔ 2. Hiệu số điểm ➔ 3. Tổng điểm ghi được.
+        </div>
+    </div>
+
+    <!-- TAB 2: DANH SÁCH TEAM & ĐÔI THI ĐẤU -->
+    <div id="tabTeams" class="tab-content" style="display: none;">
+        <div class="section-title">
+            👥 DANH SÁCH CÁC CẶP ĐẤU NỘI BỘ 
+            <span class="btc-only" style="display:none; font-size:12px; font-weight:normal;">(BTC có thể chỉnh sửa ghép cặp)</span>
+        </div>
+        <div id="teamsGrid" class="teams-grid"></div>
+    </div>
+
+    <!-- TAB 3: BẢNG XẾP HẠNG -->
+    <div id="tabStandings" class="tab-content" style="display: none;">
+        <div class="section-title">🏆 BẢNG XẾP HẠNG TỔNG SẮP 3 TEAM</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50px;">Hạng</th>
+                    <th>Tên Team</th>
+                    <th>Trận Thắng</th>
+                    <th>Trận Thua</th>
+                    <th>Hiệu Số</th>
+                    <th>Tổng Điểm</th>
+                </tr>
+            </thead>
+            <tbody id="standingsTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const PIN_BTC = "1956";
+const PIN_REFEREE = "1234";
+let currentRole = "guest"; // 'guest', 'referee', 'btc'
+
+// Định nghĩa 5 thể loại Đôi thi đấu
+const CATEGORIES = [
+    { id: 1, name: "1️⃣ Đôi Nữ (Mở màn)" },
+    { id: 2, name: "2️⃣ Đôi Nam 1" },
+    { id: 3, name: "3️⃣ Đôi Nam Nữ 1" },
+    { id: 4, name: "4️⃣ Đôi Nam 2" },
+    { id: 5, name: "5️⃣ Đôi Nam Nữ 2 (Trận chốt)" }
+];
+
+// Dữ liệu mặc định 3 Team
+const defaultTeams = {
+    A: { name: "Team A (K44+)", members: ["A Tùng", "A Hùng", "A Vỹ", "C Linh", "C Mai Lê", "A Bằng"] },
+    B: { name: "Team B (K48+)", members: ["Trưởng", "Minh", "Cường", "Hảo", "Thư", "A Hải"] },
+    C: { name: "Team C (Mix)", members: ["A Tú", "A Thi", "A Kiên", "C Đan Mai", "C Luyến", "A Tuấn"] }
+};
+
+// Cấu hình ghép cặp mặc định cho 3 Team
+let teamPairsData = {};
+
+function initDefaultPairs() {
+    teamPairsData = {
+        A: { 1: "C Linh & C Mai Lê", 2: "A Tùng & A Hùng", 3: "A Vỹ & C Linh", 4: "A Bằng & A Vỹ", 5: "A Hùng & C Mai Lê" },
+        B: { 1: "Hảo & Thư", 2: "Trưởng & Minh", 3: "Cường & Hảo", 4: "A Hải & Cường", 5: "Trưởng & Thư" },
+        C: { 1: "C Đan Mai & C Luyến", 2: "A Tú & A Thi", 3: "A Kiên & C Đan Mai", 4: "A Tuấn & A Kiên", 5: "A Tú & C Luyến" }
+    };
+}
+
+// Cấu hình 8 Lượt trận
+const SCHEDULE_CONFIG = [
+    {
+        round: 1,
+        title: "🔹 VÒNG 1: TEAM A vs TEAM B (Trọng tài: Team C)",
+        refereeTeam: "Team C",
+        courts: [
+            { courtNum: 1, matchKey: "A_B_1", catId: 1, team1: "A", team2: "B" },
+            { courtNum: 2, matchKey: "A_B_2", catId: 2, team1: "A", team2: "B" }
+        ]
+    },
+    {
+        round: 2,
+        title: "🔹 LƯỢT 2: TEAM A vs TEAM B (Trọng tài: Team C)",
+        refereeTeam: "Team C",
+        courts: [
+            { courtNum: 1, matchKey: "A_B_3", catId: 3, team1: "A", team2: "B" },
+            { courtNum: 2, matchKey: "A_B_4", catId: 4, team1: "A", team2: "B" }
+        ]
+    },
+    {
+        round: 3,
+        title: "🔹 LƯỢT 3: TEAM A vs TEAM B & CHUYỂN SANG VÒNG 2",
+        refereeTeam: "Team C / Team B",
+        courts: [
+            { courtNum: 1, matchKey: "A_B_5", catId: 5, team1: "A", team2: "B", label: "Chốt trận 1 (A vs B)" },
+            { courtNum: 2, matchKey: "C_A_1", catId: 1, team1: "C", team2: "A", label: "Vòng 2: C1 vs A1 (Đôi Nữ)" }
+        ]
+    },
+    {
+        round: 4,
+        title: "🔹 VÒNG 2: TEAM C vs TEAM A (Trọng tài: Team B cử 2 người)",
+        refereeTeam: "Team B",
+        courts: [
+            { courtNum: 1, matchKey: "C_A_2", catId: 2, team1: "C", team2: "A" },
+            { courtNum: 2, matchKey: "C_A_3", catId: 3, team1: "C", team2: "A" }
+        ]
+    },
+    {
+        round: 5,
+        title: "🔹 LƯỢT 5: TEAM C vs TEAM A (Trọng tài: Team B)",
+        refereeTeam: "Team B",
+        courts: [
+            { courtNum: 1, matchKey: "C_A_4", catId: 4, team1: "C", team2: "A" },
+            { courtNum: 2, matchKey: "C_A_5", catId: 5, team1: "C", team2: "A", label: "Chốt trận 2 (C vs A)" }
+        ]
+    },
+    {
+        round: 6,
+        title: "🔹 VÒNG 3: TEAM B vs TEAM C (Trọng tài: Team A)",
+        refereeTeam: "Team A",
+        courts: [
+            { courtNum: 1, matchKey: "B_C_1", catId: 1, team1: "B", team2: "C" },
+            { courtNum: 2, matchKey: "B_C_2", catId: 2, team1: "B", team2: "C" }
+        ]
+    },
+    {
+        round: 7,
+        title: "🔹 LƯỢT 7: TEAM B vs TEAM C (Trọng tài: Team A)",
+        refereeTeam: "Team A",
+        courts: [
+            { courtNum: 1, matchKey: "B_C_3", catId: 3, team1: "B", team2: "C" },
+            { courtNum: 2, matchKey: "B_C_4", catId: 4, team1: "B", team2: "C" }
+        ]
+    },
+    {
+        round: 8,
+        title: "🔹 LƯỢT 8: TRẬN CHỐT PHÂN ĐỊNH NGÔI VÔ ĐỊCH (TEAM B vs TEAM C)",
+        refereeTeam: "Team A",
+        courts: [
+            { courtNum: 1, matchKey: "B_C_5", catId: 5, team1: "B", team2: "C", label: "Chốt trận 3 (Chung kết)" }
+        ]
+    }
+];
+
+let matchesData = {};
+
+function initDefaultMatches() {
+    SCHEDULE_CONFIG.forEach(r => {
+        r.courts.forEach(c => {
+            if (!matchesData[c.matchKey]) {
+                matchesData[c.matchKey] = { score1: 0, score2: 0, finished: false };
+            }
+        });
+    });
+}
+
+function toggleAuthRole() {
+    if (currentRole !== 'guest') {
+        currentRole = 'guest';
+        alert("🔒 Đã chuyển về giao diện Khán giả.");
+    } else {
+        const pin = prompt("Nhập mã PIN (1234: Trọng tài | 1956: BTC):");
+        if (pin === PIN_BTC) {
+            currentRole = 'btc';
+            alert("👑 Đã đăng nhập vai trò BAN TỔ CHỨC!");
+        } else if (pin === PIN_REFEREE) {
+            currentRole = 'referee';
+            alert("🏓 Đã đăng nhập vai trò TRỌNG TÀI!");
+        } else if (pin !== null) {
+            alert("❌ Mã PIN không đúng!");
+        }
+    }
+    updateAccessUI();
+}
+
+function updateAccessUI() {
+    const authBtn = document.getElementById('authBtn');
+    if (currentRole === 'btc') {
+        authBtn.innerText = "👑 BTC"; authBtn.style.background = "#e74c3c";
+    } else if (currentRole === 'referee') {
+        authBtn.innerText = "🏓 Trọng tài"; authBtn.style.background = "#27ae60";
+    } else {
+        authBtn.innerText = "🔑 Khán giả"; authBtn.style.background = "#34495e";
+    }
+
+    const btcEls = document.querySelectorAll('.btc-only');
+    btcEls.forEach(el => el.style.display = (currentRole === 'btc') ? '' : 'none');
+
+    renderScheduleAndCourts();
+    renderTeamPairsUI();
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+    if (tab === 'schedule') {
+        document.getElementById('tabSchedule').style.display = 'block';
+        document.getElementById('tabScheduleBtn').classList.add('active');
+    } else if (tab === 'teams') {
+        document.getElementById('tabTeams').style.display = 'block';
+        document.getElementById('tabTeamsBtn').classList.add('active');
+    } else if (tab === 'standings') {
+        document.getElementById('tabStandings').style.display = 'block';
+        document.getElementById('tabStandingsBtn').classList.add('active');
+        updateStandings();
+    }
+}
+
+function renderTeamPairsUI() {
+    const container = document.getElementById('teamsGrid');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const isBtc = (currentRole === 'btc');
+
+    ['A', 'B', 'C'].forEach(tKey => {
+        const teamInfo = defaultTeams[tKey];
+        const teamBox = document.createElement('div');
+        teamBox.className = 'team-box';
+
+        let rowsHTML = '';
+        CATEGORIES.forEach(cat => {
+            const pairName = (teamPairsData[tKey] && teamPairsData[tKey][cat.id]) ? teamPairsData[tKey][cat.id] : '';
+            
+            rowsHTML += `
+                <tr>
+                    <td style="text-align:left; font-weight:bold;">${cat.name}</td>
+                    <td>
+                        ${isBtc ? `<input type="text" class="pair-input" value="${pairName}" onchange="updatePairName('${tKey}', ${cat.id}, this.value)">` : `<b>${pairName}</b>`}
+                    </td>
+                </tr>
+            `;
+        });
+
+        teamBox.innerHTML = `
+            <div class="team-title">
+                <span>${teamInfo.name}</span>
+            </div>
+            <div style="font-size:11px; color:#666; margin-bottom:6px;"><b>Thành viên:</b> ${teamInfo.members.join(', ')}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:45%;">Thể loại Đôi</th>
+                        <th>Đôi thi đấu thực tế</th>
+                    </tr>
+                </thead>
+                <tbody>${rowsHTML}</tbody>
+            </table>
+        `;
+        container.appendChild(teamBox);
+    });
+}
+
+function updatePairName(teamKey, catId, val) {
+    if (currentRole !== 'btc') return;
+    if (!teamPairsData[teamKey]) teamPairsData[teamKey] = {};
+    teamPairsData[teamKey][catId] = val.trim();
+
+    if (window.dbSet && window.dbMinigamePairsRef) {
+        window.dbSet(window.dbMinigamePairsRef, teamPairsData);
+    }
+    renderScheduleAndCourts();
+}
+
+function renderScheduleAndCourts() {
+    const container = document.getElementById('roundsGrid');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const canEdit = (currentRole === 'btc' || currentRole === 'referee');
+
+    SCHEDULE_CONFIG.forEach(rConfig => {
+        const roundDiv = document.createElement('div');
+        roundDiv.className = 'round-box';
+
+        let matchesHTML = '';
+        rConfig.courts.forEach(c => {
+            const mData = matchesData[c.matchKey] || { score1: 0, score2: 0, finished: false };
+            const catObj = CATEGORIES.find(cat => cat.id === c.catId);
+
+            const pair1 = (teamPairsData[c.team1] && teamPairsData[c.team1][c.catId]) ? teamPairsData[c.team1][c.catId] : `Đôi ${c.team1}`;
+            const pair2 = (teamPairsData[c.team2] && teamPairsData[c.team2][c.catId]) ? teamPairsData[c.team2][c.catId] : `Đôi ${c.team2}`;
+
+            let winnerText = '';
+            if (mData.finished || mData.score1 >= 21 || mData.score2 >= 21) {
+                if (mData.score1 > mData.score2) winnerText = `<div class="winner-tag">🏆 THẮNG: Team ${c.team1} (${mData.score1} - ${mData.score2})</div>`;
+                else if (mData.score2 > mData.score1) winnerText = `<div class="winner-tag">🏆 THẮNG: Team ${c.team2} (${mData.score2} - ${mData.score1})</div>`;
+                else winnerText = `<div class="winner-tag" style="background:#e67e22;">🤝 HÒA (${mData.score1} - ${mData.score2})</div>`;
+            }
+
+            let controlHTML = canEdit ? `
+                <div class="score-control">
+                    <button class="btn-step btn-minus" onclick="adjustScore('${c.matchKey}', 1, -1)" ${mData.finished ? 'disabled' : ''}>-</button>
+                    <input type="number" class="score-display" value="${mData.score1}" onchange="updateMatchScore('${c.matchKey}', 1, this.value)" ${mData.finished ? 'disabled' : ''}>
+                    <button class="btn-step btn-plus" onclick="adjustScore('${c.matchKey}', 1, 1)" ${mData.finished ? 'disabled' : ''}>+</button>
+                    <span style="font-size:18px; font-weight:bold;"> - </span>
+                    <button class="btn-step btn-minus" onclick="adjustScore('${c.matchKey}', 2, -1)" ${mData.finished ? 'disabled' : ''}>-</button>
+                    <input type="number" class="score-display" value="${mData.score2}" onchange="updateMatchScore('${c.matchKey}', 2, this.value)" ${mData.finished ? 'disabled' : ''}>
+                    <button class="btn-step btn-plus" onclick="adjustScore('${c.matchKey}', 2, 1)" ${mData.finished ? 'disabled' : ''}>+</button>
+                </div>
+                <div>
+                    <button class="btc-btn" style="background:#2980b9;" onclick="toggleFinish('${c.matchKey}')">${mData.finished ? 'Mở Lại' : 'Chốt Trận'}</button>
+                    <button class="btc-btn" style="background:#7f8c8d;" onclick="resetMatch('${c.matchKey}')">Reset</button>
+                </div>
+            ` : `<div style="font-size:22px; font-weight:bold; color:#e67e22; margin:6px 0;">${mData.score1} - ${mData.score2}</div>`;
+
+            matchesHTML += `
+                <div class="match-card">
+                    <div class="match-title">SÂN ${c.courtNum}: Team ${c.team1} vs Team ${c.team2}</div>
+                    <div class="match-category">${catObj.name}</div>
+                    <div style="font-size:12px; margin-bottom:5px;">
+                        <b>Team ${c.team1}:</b> ${pair1}<br>
+                        <span style="color:#888;">--- VS ---</span><br>
+                        <b>Team ${c.team2}:</b> ${pair2}
+                    </div>
+                    ${controlHTML}
+                    ${winnerText}
+                </div>
+            `;
+        });
+
+        roundDiv.innerHTML = `
+            <div class="round-header">${rConfig.title}</div>
+            <div class="matches-grid">${matchesHTML}</div>
+        `;
+        container.appendChild(roundDiv);
+    });
+}
+
+function adjustScore(matchKey, teamNum, delta) {
+    if (currentRole === 'guest') return;
+    if (!matchesData[matchKey]) matchesData[matchKey] = { score1: 0, score2: 0, finished: false };
+
+    const m = matchesData[matchKey];
+    if (teamNum === 1) m.score1 = Math.max(0, (m.score1 || 0) + delta);
+    if (teamNum === 2) m.score2 = Math.max(0, (m.score2 || 0) + delta);
+
+    if (m.score1 >= 21 || m.score2 >= 21) m.finished = true;
+
+    syncFirebaseMatches();
+}
+
+function updateMatchScore(matchKey, teamNum, val) {
+    if (currentRole === 'guest') return;
+    if (!matchesData[matchKey]) matchesData[matchKey] = { score1: 0, score2: 0, finished: false };
+
+    const scoreVal = parseInt(val) || 0;
+    const m = matchesData[matchKey];
+    if (teamNum === 1) m.score1 = scoreVal;
+    if (teamNum === 2) m.score2 = scoreVal;
+
+    if (m.score1 >= 21 || m.score2 >= 21) m.finished = true;
+
+    syncFirebaseMatches();
+}
+
+function toggleFinish(matchKey) {
+    if (currentRole === 'guest') return;
+    if (!matchesData[matchKey]) return;
+    matchesData[matchKey].finished = !matchesData[matchKey].finished;
+    syncFirebaseMatches();
+}
+
+function resetMatch(matchKey) {
+    if (currentRole === 'guest') return;
+    matchesData[matchKey] = { score1: 0, score2: 0, finished: false };
+    syncFirebaseMatches();
+}
+
+function syncFirebaseMatches() {
+    renderScheduleAndCourts();
+    updateStandings();
+    if (window.dbSet && window.dbMinigameMatchesRef && currentRole !== 'guest') {
+        window.dbSet(window.dbMinigameMatchesRef, matchesData);
+    }
+}
+
+function updateStandings() {
+    const tbody = document.getElementById('standingsTableBody');
+    if (!tbody) return;
+
+    let stats = {
+        A: { name: defaultTeams.A.name, won: 0, lost: 0, ptsFor: 0, ptsAgainst: 0 },
+        B: { name: defaultTeams.B.name, won: 0, lost: 0, ptsFor: 0, ptsAgainst: 0 },
+        C: { name: defaultTeams.C.name, won: 0, lost: 0, ptsFor: 0, ptsAgainst: 0 }
+    };
+
+    SCHEDULE_CONFIG.forEach(r => {
+        r.courts.forEach(c => {
+            const mData = matchesData[c.matchKey];
+            if (mData && (mData.finished || mData.score1 >= 21 || mData.score2 >= 21)) {
+                const t1 = c.team1;
+                const t2 = c.team2;
+
+                stats[t1].ptsFor += mData.score1; stats[t1].ptsAgainst += mData.score2;
+                stats[t2].ptsFor += mData.score2; stats[t2].ptsAgainst += mData.score1;
+
+                if (mData.score1 > mData.score2) {
+                    stats[t1].won++; stats[t2].lost++;
+                } else if (mData.score2 > mData.score1) {
+                    stats[t2].won++; stats[t1].lost++;
+                }
+            }
+        });
+    });
+
+    let standingsArr = Object.keys(stats).map(k => {
+        const item = stats[k];
+        return {
+            key: k,
+            name: item.name,
+            won: item.won,
+            lost: item.lost,
+            diff: item.ptsFor - item.ptsAgainst,
+            totalPts: item.ptsFor
+        };
+    });
+
+    // Sắp xếp: 1. Số trận thắng Đôi -> 2. Hiệu số -> 3. Tổng điểm
+    standingsArr.sort((a, b) => b.won - a.won || b.diff - a.diff || b.totalPts - a.totalPts);
+
+    tbody.innerHTML = '';
+    standingsArr.forEach((st, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><b>${idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : '🥉 3'}</b></td>
+            <td style="text-align:left;"><b>${st.name}</b></td>
+            <td style="color:#27ae60; font-weight:bold;">${st.won}</td>
+            <td style="color:#e74c3c;">${st.lost}</td>
+            <td style="font-weight:bold; color:${st.diff >= 0 ? '#27ae60' : '#e74c3c'}">${st.diff > 0 ? '+' + st.diff : st.diff}</td>
+            <td style="font-weight:bold;">${st.totalPts}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+window.onload = () => {
+    initDefaultPairs();
+    initDefaultMatches();
+    renderTeamPairsUI();
+    renderScheduleAndCourts();
+    updateStandings();
+};
+</script>
+
+</body>
+</html>
