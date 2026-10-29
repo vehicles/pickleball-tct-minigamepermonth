@@ -166,7 +166,7 @@
             border-left: 4px solid #0ea5e9;
         }
 
-        /* STYLE DANH SÁCH TEAM */
+        /* STYLE  TEAM */
         .teams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
         .team-box { 
             border: 1px solid #334155; 
@@ -283,7 +283,7 @@
 
     <div class="nav-tabs">
         <button id="tabScheduleBtn" class="tab-btn active" onclick="switchTab('schedule')">📅 LỊCH THI ĐẤU</button>
-        <button id="tabTeamsBtn" class="tab-btn" onclick="switchTab('teams')">👥 DANH SÁCH</button>
+        <button id="tabTeamsBtn" class="tab-btn" onclick="switchTab('teams')">👥 </button>
         <button id="tabStandingsBtn" class="tab-btn" onclick="switchTab('standings')">🏆 BẢNG XẾP HẠNG</button>
     </div>
 
@@ -342,7 +342,7 @@ const CATEGORIES = [
 ];
 
 const defaultTeams = {
-    A: { name: "Team A (K44+)", members: ["A Tùng", "A Hùng", "A Vỹ", "C Linh", "C Mai Lê", "A Bằng"] },
+    A: { name: "Team A (K44+)", members: ["A. Tùng", "A. Hùng", "A Vỹ", "C Linh", "C Mai Lê", "A Bằng"] },
     B: { name: "Team B (K48+)", members: ["Trưởng", "Minh", "Cường", "Hảo", "Thư", "A Hải"] },
     C: { name: "Team C (Mix)", members: ["A Tú", "A Thi", "A Kiên", "C Đan Mai", "C Luyến", "A Tuấn"] }
 };
@@ -526,7 +526,6 @@ function renderTeamPairsUI() {
             <div class="team-title">
                 <span>${teamInfo.name}</span>
             </div>
-            <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;"><b>Thành viên:</b> ... </div>
             <table>
                 <thead>
                     <tr>
