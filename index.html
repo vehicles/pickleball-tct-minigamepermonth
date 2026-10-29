@@ -521,23 +521,6 @@ function renderTeamPairsUI() {
                 </tr>
             `;
         });
-
-        teamBox.innerHTML = `
-            <div class="team-title">
-                <span>${teamInfo.name}</span>
-            </div>
-            <div style="font-size:11px; color:#94a3b8; margin-bottom:6px;"><b>Thành viên:</b> ${teamInfo.members.join(', ')}</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:45%; color:#38bdf8;">Thể loại Đôi</th>
-                        <th style="color:#38bdf8;">Đôi thi đấu thực tế</th>
-                    </tr>
-                </thead>
-                <tbody>${rowsHTML}</tbody>
-            </table>
-        `;
-        /*container.appendChild(teamBox);*/
     });
 }
 
