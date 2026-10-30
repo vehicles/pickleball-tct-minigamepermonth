@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Minigame Pickleball TCT Club</title>
+    <!-- Thư viện chụp ảnh HTML2Canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <!-- Thư viện Firebase Realtime Database SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -25,8 +28,10 @@
         
         window.dbMinigameMatchesRef = ref(db, 'minigame_matches');
         window.dbMinigamePairsRef = ref(db, 'minigame_pairs');
+        window.dbMinigameLockedPairsRef = ref(db, 'minigame_locked_pairs');
         window.dbSet = set;
 
+        // Lắng nghe dữ liệu Trận đấu
         onValue(window.dbMinigameMatchesRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
@@ -38,6 +43,7 @@
             updateStandings();
         });
 
+        // Lắng nghe dữ liệu Ghép cặp VĐV
         onValue(window.dbMinigamePairsRef, (snapshot) => {
             const data = snapshot.val();
             if (data) {
@@ -46,6 +52,17 @@
                 initDefaultPairs();
             }
             renderTeamPairsUI();
+            renderScheduleAndCourts();
+        });
+
+        // Lắng nghe dữ liệu Đóng băng VĐV theo từng trận đấu
+        onValue(window.dbMinigameLockedPairsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                lockedMatchPairsData = data;
+            } else {
+                lockedMatchPairsData = {};
+            }
             renderScheduleAndCourts();
         });
     </script>
@@ -155,6 +172,9 @@
         }
 
         .section-title { 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             background: #0f172a; 
             color: #38bdf8; 
             padding: 10px 14px; 
@@ -166,14 +186,14 @@
             border-left: 4px solid #0ea5e9;
         }
 
-        /* STYLE BẢNG VINH DANH (PODIUM) */
+        /* BẢNG VINH DANH (PODIUM) CẢI TIẾN NỔI BẬT */
         .podium-container {
             display: flex;
             justify-content: center;
             align-items: flex-end;
             gap: 15px;
             margin: 20px 0 25px 0;
-            padding: 15px;
+            padding: 20px 15px;
             background: #0f172a;
             border: 1px solid #334155;
             border-radius: 12px;
@@ -184,48 +204,50 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            border-radius: 10px;
-            padding: 12px 8px;
+            border-radius: 12px;
+            padding: 14px 8px;
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             position: relative;
             background: #1e293b;
             border: 1px solid #475569;
+            transition: transform 0.3s ease;
         }
         .podium-rank {
-            font-size: 24px;
+            font-size: 28px;
             margin-bottom: 4px;
         }
         .podium-1 {
             order: 2;
             border: 2px solid #f59e0b;
-            background: #271e05;
-            transform: scale(1.05);
+            background: linear-gradient(180deg, #3a2807 0%, #1e293b 100%);
+            transform: scale(1.08);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.45);
         }
         .podium-2 {
             order: 1;
             border: 2px solid #94a3b8;
-            background: #182232;
+            background: linear-gradient(180deg, #1e2e42 0%, #1e293b 100%);
         }
         .podium-3 {
             order: 3;
             border: 2px solid #d97706;
-            background: #231609;
+            background: linear-gradient(180deg, #2e1c0c 0%, #1e293b 100%);
         }
         .podium-name {
             font-weight: bold;
-            font-size: 13px;
+            font-size: 14px;
             color: #f8fafc;
-            margin-top: 4px;
+            margin-top: 6px;
         }
         .podium-score {
             font-size: 11px;
             color: #94a3b8;
-            margin-top: 2px;
+            margin-top: 3px;
             font-weight: 600;
         }
 
-        /* STYLE TEAM */
+        /* TEAM GRID */
         .teams-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
         .team-box { 
             border: 1px solid #334155; 
@@ -251,7 +273,7 @@
             box-sizing: border-box; 
         }
 
-        /* STYLE SÂN ĐẤU & LỊCH THI ĐẤU */
+        /* SÂN ĐẤU & LỊCH THI ĐẤU */
         .rounds-container { display: flex; flex-direction: column; gap: 15px; }
         .round-box { border: 1px solid #334155; border-radius: 10px; padding: 12px; background: #1e293b; }
         .round-header { 
@@ -274,7 +296,7 @@
             text-align: center; 
             position: relative;
         }
-        .match-title { font-weight: bold; color: #f8fafc; font-size: 13px; margin-bottom: 4px; }
+        .match-title { font-weight: bold; color: #f8fafc; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 4px; flex-wrap: wrap;}
         .match-category { font-size: 11px; color: #38bdf8; font-weight: bold; margin-bottom: 8px; }
 
         .score-control { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
@@ -297,12 +319,53 @@
 
         .winner-tag { background: #22c55e; color: white; font-weight: bold; padding: 5px; border-radius: 4px; font-size: 11px; margin-top: 6px; }
 
-        /* Rules card */
+        /* HUY HIỆU LIVE NHẤP NHÁY */
+        .live-tag {
+            background: #ef4444;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 4px;
+            animation: blink 1.5s infinite;
+        }
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+
         .rules-card { background: #0f172a; border-left: 4px solid #0ea5e9; padding: 12px; font-size: 11px; line-height: 1.6; margin-top: 15px; border-radius: 0 8px 8px 0; color: #94a3b8; }
 
         .btc-btn { background: #ef4444; color: white; border: none; padding: 6px 10px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-left: 3px; }
+        .btn-export { background: #10b981; color: white; border: none; padding: 5px 10px; font-size: 11px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: all 0.2s; }
+        .btn-export:hover { background: #059669; }
+
         .lock-match-btn { background: #d97706; color: white; border: none; padding: 3px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         .lock-match-btn.locked { background: #16a34a; }
+
+        /* NÚT SCROLL TO TOP */
+        #scrollTopBtn {
+            display: none;
+            position: fixed;
+            bottom: 25px;
+            right: 20px;
+            background: #0284c7;
+            color: #fff;
+            border: 1px solid #38bdf8;
+            border-radius: 50%;
+            width: 42px;
+            height: 42px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            z-index: 1000;
+            transition: all 0.2s;
+        }
+        #scrollTopBtn:hover {
+            background: #0369a1;
+            transform: translateY(-3px);
+        }
 
         @media (max-width: 600px) {
             .header {
@@ -323,10 +386,10 @@
             }
             .podium-container {
                 gap: 8px;
-                padding: 10px 5px;
+                padding: 12px 5px;
             }
             .podium-card {
-                padding: 8px 4px;
+                padding: 10px 4px;
             }
             .podium-name {
                 font-size: 11px;
@@ -360,25 +423,22 @@
 
     <!-- TAB 1: LỊCH THI ĐẤU & CẶP ĐẤU -->
     <div id="tabSchedule" class="tab-content">
-        <div class="section-title">📅 LỊCH THI ĐẤU CHI TIẾT</div>
+        <div class="section-title"><span>📅 LỊCH THI ĐẤU CHI TIẾT</span></div>
         <div id="roundsGrid" class="rounds-container"></div>
 
         <div class="rules-card">
             <strong style="color: #f59e0b;">📋 LUẬT TÍNH ĐIỂM & XẾP HẠNG:</strong><br>
             • Thi đấu Rally Scoring chạm 21 điểm (Đổi sân ở mốc 11 điểm).<br>
             • Mốc 21 điểm áp dụng <i>Side-Out Match Point</i> (Đội Giao bóng mới được ăn điểm quyết định).<br>
-            • Xếp hạng: 
-            1. Tổng số trận thắng Đôi
-            2. Hiệu số điểm
-            3. Tổng điểm ghi được.<br>
-            • <b>Đóng băng VĐV theo TRẬN:</b> Nhấn "Chốt" hoặc xong trận sẽ lưu cố định VĐV thi đấu trận đó ở Local, giúp thay đổi VĐV cho các trận tiếp theo mà không làm ảnh hưởng kết quả trận cũ.
+            • Xếp hạng: 1. Tổng số trận thắng Đôi ➔ 2. Hiệu số điểm ➔ 3. Tổng điểm ghi được.<br>
+            • <b>Đóng băng VĐV theo TRẬN:</b> Nhấn "Chốt" hoặc xong trận sẽ lưu cố định VĐV thi đấu trận đó, giúp thay đổi VĐV cho các trận tiếp theo mà không làm ảnh hưởng kết quả trận cũ.
         </div>
     </div>
 
     <!-- TAB 2: DANH SÁCH TEAM & ĐÔI THI ĐẤU -->
     <div id="tabTeams" class="tab-content" style="display: none;">
         <div class="section-title">
-            👥 DANH SÁCH CÁC CẶP ĐẤU NỘI BỘ 
+            <span>👥 DANH SÁCH CÁC CẶP ĐẤU NỘI BỘ</span>
             <span class="btc-only" style="display:none; font-size:11px; font-weight:normal; color:#cbd5e1;">(BTC có thể chỉnh sửa ghép cặp)</span>
         </div>
         <div id="teamsGrid" class="teams-grid"></div>
@@ -386,27 +446,35 @@
 
     <!-- TAB 3: BẢNG XẾP HẠNG & BẢNG VINH DANH -->
     <div id="tabStandings" class="tab-content" style="display: none;">
-        <div class="section-title">🏅 BẢNG VINH DANH TẬP THỂ</div>
-        
-        <!-- BẢNG VINH DANH (PODIUM) TOP 3 -->
-        <div id="podiumContainer" class="podium-container"></div>
+        <div id="exportableArea" style="padding: 10px; background:#1e293b; border-radius:8px;">
+            <div class="section-title">
+                <span>🏅 BẢNG VINH DANH TẬP THỂ</span>
+                <button class="btn-export" onclick="exportStandingsImage()">📸 Xuất Ảnh Kết Quả</button>
+            </div>
+            
+            <!-- BẢNG VINH DANH (PODIUM) TOP 3 -->
+            <div id="podiumContainer" class="podium-container"></div>
 
-        <div class="section-title">🏆 CHI TIẾT BẢNG XẾP HẠNG</div>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 50px;">Hạng</th>
-                    <th>Tên Team</th>
-                    <th>Trận Thắng</th>
-                    <th>Trận Thua</th>
-                    <th>Hiệu Số</th>
-                    <th>Tổng Điểm</th>
-                </tr>
-            </thead>
-            <tbody id="standingsTableBody"></tbody>
-        </table>
+            <div class="section-title"><span>🏆 CHI TIẾT BẢNG XẾP HẠNG</span></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">Hạng</th>
+                        <th>Tên Team</th>
+                        <th>Trận Thắng</th>
+                        <th>Trận Thua</th>
+                        <th>Hiệu Số</th>
+                        <th>Tổng Điểm</th>
+                    </tr>
+                </thead>
+                <tbody id="standingsTableBody"></tbody>
+            </table>
+        </div>
     </div>
 </div>
+
+<!-- NÚT CUỘN LÊN ĐẦU TRANG -->
+<button id="scrollTopBtn" onclick="window.scrollTo({top: 0, behavior: 'smooth'})" title="Lên đầu trang">⬆</button>
 
 <script>
 const PIN_BTC = "1956";
@@ -422,28 +490,22 @@ const CATEGORIES = [
 ];
 
 const defaultTeams = {
-    A: { name: "Team A (K44+)", members: ["A. Tùng", "A. Hùng", "A. Vỹ", "C. Linh", "C. Mai Lê", "A. Bằng"] },
-    B: { name: "Team B (K48+)", members: ["A. Trưởng", "A. Minh", "A. Cường", "C. Hảo", "C. Thư", "A. Hải"] },
-    C: { name: "Team C (Mix)", members: ["A. Tú", "A. Thi", "A. Kiên", "C. Đan Mai", "C. Luyến", "A. Tuấn"] }
+    A: { name: "Team A (K44+)", members: ["A. Tùng", "A. Hùng", "A Vỹ", "C Linh", "C Mai Lê", "A Bằng"] },
+    B: { name: "Team B (K48+)", members: ["Trưởng", "Minh", "Cường", "Hảo", "Thư", "A Hải"] },
+    C: { name: "Team C (Mix)", members: ["A Tú", "A Thi", "A Kiên", "C Đan Mai", "C Luyến", "A Tuấn"] }
 };
 
 let teamPairsData = {};
-let lockedMatchPairsData = {}; // Lưu VĐV đóng băng theo từng trận đấu (matchKey)
+let lockedMatchPairsData = {}; 
 
-function loadLockedMatchesFromLocal() {
-    try {
-        const saved = localStorage.getItem('pickleball_locked_matches_pairs');
-        if (saved) lockedMatchPairsData = JSON.parse(saved);
-    } catch(e) {
-        console.error("Không thể đọc localStorage", e);
-    }
-}
-
-function saveLockedMatchesToLocal() {
+function syncLockedMatchesToFirebase() {
     try {
         localStorage.setItem('pickleball_locked_matches_pairs', JSON.stringify(lockedMatchPairsData));
+        if (window.dbSet && window.dbMinigameLockedPairsRef && currentRole !== 'guest') {
+            window.dbSet(window.dbMinigameLockedPairsRef, lockedMatchPairsData);
+        }
     } catch(e) {
-        console.error("Không thể ghi localStorage", e);
+        console.error("Lỗi đồng bộ danh sách VĐV đã chốt:", e);
     }
 }
 
@@ -649,7 +711,6 @@ function updatePairName(teamKey, catId, val) {
     renderScheduleAndCourts();
 }
 
-// Hàm đóng băng/khóa riêng cặp VĐV của TRẬN ĐẤU
 function lockMatchPair(matchKey, team1Key, team2Key, catId) {
     const pair1 = (teamPairsData[team1Key] && teamPairsData[team1Key][catId]) ? teamPairsData[team1Key][catId] : `Đôi ${team1Key}`;
     const pair2 = (teamPairsData[team2Key] && teamPairsData[team2Key][catId]) ? teamPairsData[team2Key][catId] : `Đôi ${team2Key}`;
@@ -658,13 +719,13 @@ function lockMatchPair(matchKey, team1Key, team2Key, catId) {
         pair1: pair1,
         pair2: pair2
     };
-    saveLockedMatchesToLocal();
+    syncLockedMatchesToFirebase();
 }
 
 function unlockMatchPair(matchKey) {
     if (currentRole === 'guest') return;
     delete lockedMatchPairsData[matchKey];
-    saveLockedMatchesToLocal();
+    syncLockedMatchesToFirebase();
     renderScheduleAndCourts();
 }
 
@@ -704,7 +765,8 @@ function renderScheduleAndCourts() {
                 else winnerText = `<div class="winner-tag" style="background:#e67e22;">🤝 HÒA (${mData.score1} - ${mData.score2})</div>`;
             }
 
-            let lockTag = isMatchLocked ? `<span style="font-size:10px; color:#22c55e; margin-left:5px;">🔒 Đã chốt VĐV</span>` : '';
+            let liveTag = (!mData.finished && (mData.score1 > 0 || mData.score2 > 0)) ? `<span class="live-tag">🔴 LIVE</span>` : '';
+            let lockTag = isMatchLocked ? `<span style="font-size:10px; color:#22c55e;">🔒 Đã chốt VĐV</span>` : '';
 
             let controlHTML = canEdit ? `
                 <div class="score-control">
@@ -725,7 +787,11 @@ function renderScheduleAndCourts() {
 
             matchesHTML += `
                 <div class="match-card">
-                    <div class="match-title">SÂN ${c.courtNum}: Team ${c.team1} vs Team ${c.team2} ${lockTag}</div>
+                    <div class="match-title">
+                        <span>SÂN ${c.courtNum}: Team ${c.team1} vs Team ${c.team2}</span>
+                        ${liveTag}
+                        ${lockTag}
+                    </div>
                     <div class="match-category">${catObj.name}</div>
                     <div style="font-size:12px; margin-bottom:5px; color:#cbd5e1; line-height:1.5;">
                         <b>Team ${c.team1}:</b> <span style="color:#38bdf8;">${currentPairs.pair1}</span><br>
@@ -758,7 +824,6 @@ function adjustScore(matchKey, teamNum, delta, team1Key, team2Key, catId) {
 
     if (m.score1 >= 21 || m.score2 >= 21) {
         m.finished = true;
-        // Tự động chốt VĐV của TRẬN NÀY khi đạt 21 điểm
         if (!lockedMatchPairsData[matchKey]) {
             lockMatchPair(matchKey, team1Key, team2Key, catId);
         }
@@ -800,8 +865,11 @@ function toggleFinish(matchKey, team1Key, team2Key, catId) {
 
 function resetMatch(matchKey) {
     if (currentRole === 'guest') return;
-    matchesData[matchKey] = { score1: 0, score2: 0, finished: false };
-    syncFirebaseMatches();
+    if (confirm("⚠️ Bạn có chắc chắn muốn xoá điểm và đưa trận đấu này về 0 - 0?")) {
+        matchesData[matchKey] = { score1: 0, score2: 0, finished: false };
+        unlockMatchPair(matchKey);
+        syncFirebaseMatches();
+    }
 }
 
 function syncFirebaseMatches() {
@@ -896,8 +964,33 @@ function updateStandings() {
     });
 }
 
+// XUẤT BẢNG XẾP HẠNG VÀ PODIUM THÀNH ẢNH PNG
+function exportStandingsImage() {
+    const targetEl = document.getElementById('exportableArea');
+    if (!targetEl) return;
+
+    html2canvas(targetEl, {
+        backgroundColor: '#1e293b',
+        scale: 2
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'KetQua_Minigame_Pickleball.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }).catch(err => {
+        alert('Có lỗi xảy ra khi tạo ảnh kết quả.');
+        console.error(err);
+    });
+}
+
+window.onscroll = () => {
+    const btn = document.getElementById('scrollTopBtn');
+    if (btn) {
+        btn.style.display = (document.body.scrollTop > 200 || document.documentElement.scrollTop > 200) ? 'block' : 'none';
+    }
+};
+
 window.onload = () => {
-    loadLockedMatchesFromLocal();
     initDefaultPairs();
     initDefaultMatches();
     renderTeamPairsUI();
